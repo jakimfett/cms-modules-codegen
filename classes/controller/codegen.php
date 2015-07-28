@@ -42,8 +42,6 @@ class Controller_Codegen extends Controller_Template
 
     public function action_generate()
     {
-        $this->template->body->min = $this->min;
-        $this->template->body->min = $this->max;
 
         foreach ($this->locations as $location) {
             for ($i = 0; $i < $this->limit; $i++) {
@@ -58,7 +56,11 @@ class Controller_Codegen extends Controller_Template
             }
         }
 
-        $this->template->body->codes = $this->codes;
+        $this->template->body->min          = $this->min;
+        $this->template->body->max          = $this->max;
+        $this->template->body->codes        = $this->codes;
+        $this->template->body->total_unique = $this->max - $this->min;
+        $this->template->body->locations    = $this->locations;
     }
 
     private function _convert_alpha_to_integer($alpha)
