@@ -1,6 +1,7 @@
 <?php
 
-class Controller_Codegen extends Controller_Template {
+class Controller_Codegen extends Controller_Template
+{
 
     public $template = 'template/blank';
     public $title;
@@ -8,12 +9,14 @@ class Controller_Codegen extends Controller_Template {
     public $codes = array();
     public $min;
     public $max;
+    private $_model = NULL;
 
     /**
      * Loads the template [View] object.
      */
     public function before() {
         parent::before();
+        $this->_model = Model::factory("Codegen");
 
         Theme::set_theme('labyrinth');
 
@@ -23,7 +26,7 @@ class Controller_Codegen extends Controller_Template {
         $this->template->header->scripts = array();
 
         $this->template->header->title = $this->title;
-        $this->template->body = View::factory('template/generate');
+
         $this->template->footer = View::factory('template/footer');
 
 
@@ -34,30 +37,49 @@ class Controller_Codegen extends Controller_Template {
     }
 
     public function action_generate() {
-        $this->limit = $this->request->param('limit', 10);
+        $this->limit = (int) $this->request->param('limit', 10);
+        $this->template->body = View::factory('template/generate');
+
+        $existing_codes = $this->_model->get_existing_promo_codes_as_array();
+
+
 
         for ($i = 0; $i < $this->limit; $i++) {
             $duplicate = true;
             while ($duplicate) {
                 $random = rand($this->min, $this->max);
-                if (!in_array($random, $this->codes)) {
+                if (!in_array($random, $this->codes) && !in_array($random, $existing_codes)) {
                     $duplicate = false;
                     $this->codes[] = $this->_convert_integer_to_alpha($random);
                 }
             }
         }
+        $result = $this->_model->put_generated_codes_into_database($this->codes);
+        $this->template->body->success = false;
+        if (is_array($result)) {
+            if (!is_null($result[0]) && !is_null($result[1])) {
+                if ($result[1] === $this->limit) {
+                    $this->template->body->success = true;
+                }
+            }
+        }
 
-        $this->template->body->min = $this->min;
-        $this->template->body->max = $this->max;
-        $this->template->body->codes = $this->codes;
-        $this->template->body->total_unique = $this->max - $this->min;
+        $this->template->body->generated = $this->limit;
+    }
+
+    public function action_get_unprinted() {
+        $unprinted = $this->_model->get_unprinted_promo_codes();
+        foreach ($unprinted as $code) {
+            $this->codes[] = $code["code"];
+        }
+        $this->_make_csv_download($this->codes);
     }
 
     private function _make_csv_download(Array $values, $filename = 'codes.csv') {
         $this->template->body = View::factory('template/csv_download');
         $this->template->body->filename = $filename;
         $this->template->body->content = '';
-        foreach ($this->codes as $code) {
+        foreach ($values as $code) {
             $this->template->body->content .= strtoupper($code) . "\r\n";
         }
         echo $this->template->body->render();
